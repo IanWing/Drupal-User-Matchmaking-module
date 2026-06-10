@@ -2,3 +2,28 @@ fields:
   offers: ''
   needs: ''
   notification: ''
+mail:
+  matches_url: ''
+  enable_emails: ''
+  seeker_match_notification:
+    subject: 'New match: [offerer:display-name] matches your needs!'
+    body: |
+      Hi [seeker:display-name],
+
+      Good news! [offerer:display-name] has skills matching your needs in: [matched_terms].
+
+      View their profile: [offerer:url]
+
+      Best regards
+  offerer_match_summary:
+    subject: 'You have [match_count] new match(es)!'
+    body: |
+      Hi [offerer:display-name],
+
+      Your profile matched with [match_count] user(s):
+
+      [matched_users_list]
+
+      View all your matches: [matches_url]
+
+      Best regards
