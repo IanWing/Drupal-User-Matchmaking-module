@@ -10,9 +10,11 @@ use Drupal\Core\Block\BlockBase;
  *   admin_label = @Translation("Notification Bell"),
  * )
  */
-class NotificationBellBlock extends BlockBase {
+class NotificationBellBlock extends BlockBase
+{
 
-  public function build(): array {
+  public function build(): array
+  {
     $account = \Drupal::currentUser();
 
     if ($account->isAnonymous()) {
@@ -26,11 +28,16 @@ class NotificationBellBlock extends BlockBase {
     if ($user && !empty($field_notification) && $user->hasField($field_notification)) {
       $active = (bool) $user->get($field_notification)->value;
     }
-
     return [
-      '#markup'   => '<div id="notification_bell" class="notification-bell' . ($active ? ' active' : '') . '"></div>',
-      '#attached' => ['library' => ['user_matchmaking/notification']],
-      '#cache'    => ['contexts' => ['user'], 'max-age' => 0],
+      '#theme' => 'user_matchmaking_notification_bell',
+      '#active' => $active,
+      '#attached' => [
+        'library' => ['user_matchmaking/notification'],
+      ],
+      '#cache' => [
+        'contexts' => ['user'],
+        'max-age' => 0,
+      ],
     ];
   }
 }
