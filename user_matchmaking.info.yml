@@ -1,0 +1,5 @@
+name: 'User Matchmaking'
+type: module
+description: 'Match users based on configurable taxonomy fields and manage notifications.'
+core_version_requirement: ^10
+package: Custom

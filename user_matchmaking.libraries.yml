@@ -1,0 +1,9 @@
+notification:
+    css:
+        theme:
+            css/notification.css: {}
+    js:
+        js/notification.js: {}
+    dependencies:
+        - core/drupal
+        - core/once
