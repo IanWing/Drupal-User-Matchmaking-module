@@ -1,0 +1,29 @@
+<?php
+
+/**
+ * Implements hook_install()
+ */
+function user_matchmaking_install(): void {
+  $config = \Drupal::configFactory()->getEditable('user_matchmaking.settings');
+
+  $config
+    ->set('fields.offers', '')
+    ->set('fields.needs', '')
+    ->set('fields.notification', '')
+    ->set('mail.enable_emails', '')
+    ->set('mail.matches_url', '')
+    ->set('mail.seeker_match_notification.subject', 'New match: [offerer:display-name] matches your needs!')
+    ->set('mail.seeker_match_notification.body',
+      "Hi [seeker:display-name],\n\n" .
+      "Good news! [offerer:display-name] matched with you based on: [matched_terms].\n\n" .
+      "View their profile: [offerer:url]\n\nBest regards"
+    )
+    ->set('mail.offerer_match_summary.subject', 'You have [match_count] new match(es)!')
+    ->set('mail.offerer_match_summary.body',
+      "Hi [offerer:display-name],\n\n" .
+      "Your profile matched with [match_count] user(s):\n\n" .
+      "[matched_users_list]\n\n" .
+      "View all your matches: [matches_url]\n\nBest regards"
+    )
+    ->save();
+}
