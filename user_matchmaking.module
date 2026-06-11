@@ -2,6 +2,17 @@
 
 use Drupal\Core\Entity\EntityInterface;
 
+function _user_matchmaking_get_settings(): array
+{
+    $config = \Drupal::config('user_matchmaking.settings');
+    return [
+        'field_offers' => (string) $config->get('fields.offers'),
+        'field_needs' => (string) $config->get('fields.needs'),
+        'field_notification' => (string) $config->get('fields.notification'),
+        'enable_emails' => $config->get('mail.enable_emails'),
+    ];
+}
+
 /**
  * Implements hook_entity_insert() 
  */
@@ -63,6 +74,8 @@ function _user_matchmaking_core(EntityInterface $offerer, array $settings): void
     $field_offers = $settings['field_offers'];
     $field_needs = $settings['field_needs'];
     $field_notification = $settings['field_notification'];
+    $emails_enabled = $settings['enable_emails'];
+
 
     $offerer_uid = $offerer->id();
     $offer_ids = array_column($offerer->get($field_offers)->getValue(), 'target_id');
@@ -82,6 +95,7 @@ function _user_matchmaking_core(EntityInterface $offerer, array $settings): void
     $seekers = \Drupal::entityTypeManager()->getStorage('user')->loadMultiple($seeker_uids);
     $match_store = \Drupal::entityTypeManager()->getStorage('user_match');
     $timestamp = time();
+
 
     $offered_entities = [];
     $field_def = \Drupal::service('entity_field.manager')
@@ -123,7 +137,10 @@ function _user_matchmaking_core(EntityInterface $offerer, array $settings): void
             $seeker->set($field_notification, 1)->save();
         }
         $notified_seekers[] = $seeker;
-        _user_matchmaking_mail_seeker($seeker, $offerer, $matched_entities);
+
+        if ($emails_enabled) {
+            _user_matchmaking_mail_seeker($seeker, $offerer, $matched_entities);
+        }
     }
 
 
@@ -132,7 +149,11 @@ function _user_matchmaking_core(EntityInterface $offerer, array $settings): void
             $offerer->_user_matchmaking_skip = TRUE;
             $offerer->set($field_notification, 1)->save();
         }
-        _user_matchmaking_mail_offerer($offerer, count($notified_seekers), $notified_seekers);
+
+        if ($emails_enabled) {
+
+            _user_matchmaking_mail_offerer($offerer, count($notified_seekers), $notified_seekers);
+        }
     }
 }
 
@@ -150,7 +171,49 @@ function _user_matchmaking_save_match($store, array $existing, string $key, $off
     }
 }
 
-// add theme hook for notification icon
+
+/**
+ * Implements hook_mail()
+ */
+function user_matchmaking_mail($key, &$message, $params): void
+{
+    $config = $params['config'];
+
+    switch ($key) {
+        case 'seeker_match_notification':
+            $user_url = \Drupal::service('url_generator')->generateFromRoute(
+                'entity.user.canonical',
+                ['user' => $params['offerer']->id()],
+                ['absolute' => TRUE]
+            );
+            $replace = [
+                '[offerer:display-name]' => $params['offerer']->getDisplayName(),
+                '[seeker:display-name]' => $params['seeker']->getDisplayName(),
+                '[matched_terms]' => $params['matched_terms'],
+                '[offerer:url]' => $user_url,
+            ];
+            $message['subject'] = strtr($config->get('mail.seeker_match_notification.subject'), $replace);
+            $message['body'][] = strtr($config->get('mail.seeker_match_notification.body'),  $replace);
+            break;
+
+        case 'offerer_match_summary':
+            $lines = [];
+            foreach ($params['matched_seekers'] as $seeker) {
+                $lines[] = '- ' . $seeker->getDisplayName();
+            }
+            $replace = [
+                '[offerer:display-name]' => $params['offerer']->getDisplayName(),
+                '[match_count]' => (string) $params['match_count'],
+                '[matched_users_list]' => implode("\n", $lines),
+                '[matches_url]' => (string) $config->get('mail.matches_url'),
+            ];
+            $message['subject'] = strtr($config->get('mail.offerer_match_summary.subject'), $replace);
+            $message['body'][] = strtr($config->get('mail.offerer_match_summary.body'), $replace);
+            break;
+    }
+}
+
+// theme hook for notification icon
 function user_matchmaking_theme($existing, $type, $theme, $path): array
 {
     return [
@@ -163,7 +226,4 @@ function user_matchmaking_theme($existing, $type, $theme, $path): array
     ];
 }
 
-
-// @todo email logic
 // @todo logs
-// @todo module config status
