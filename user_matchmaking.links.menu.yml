@@ -1,0 +1,6 @@
+user_matchmaking.settings:
+  title: 'User Matchmaking'
+  description: 'Configure matchmaking fields and email settings.'
+  parent: system.admin_config_people
+  route_name: user_matchmaking.settings
+  weight: 10
