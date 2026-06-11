@@ -1,0 +1,16 @@
+user_matchmaking.clear_notification:
+  path: '/notification/clear'
+  defaults:
+    _controller: '\Drupal\user_matchmaking\Controller\NotificationController::clear'
+    _title: 'Clear notification'
+  requirements:
+    _permission: 'access content'
+  methods: [POST]
+
+user_matchmaking.settings:
+  path: '/admin/config/people/matchmaking'
+  defaults:
+    _form: '\Drupal\user_matchmaking\Form\MatchmakingSettingsForm'
+    _title: 'Matchmaking Settings'
+  requirements:
+    _permission: 'administer users'
