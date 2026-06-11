@@ -1,6 +1,7 @@
 <?php
 
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Url;
 
 function _user_matchmaking_get_settings(): array
 {
@@ -222,6 +223,33 @@ function user_matchmaking_theme($existing, $type, $theme, $path): array
                 'active' => FALSE,
             ],
             'template' => 'user-matchmaking-notification-bell',
+        ],
+    ];
+}
+
+
+/**
+ * Implements hook_requirements()
+ * /admin/reports/status 
+ */
+function user_matchmaking_requirements($phase): array
+{
+    if ($phase !== 'runtime') {
+        return [];
+    }
+    $config = \Drupal::config('user_matchmaking.settings');
+    $configured = $config->get('fields.offers') && $config->get('fields.needs');
+    $settings_url = Url::fromRoute('user_matchmaking.settings')->toString();
+
+    return [
+        'user_matchmaking' => [
+            'title' => t('User Matchmaking'),
+            'value' => $configured ? t('Configured') : t('Not configured'),
+            'description' => $configured ? '' : t(
+                'Matching fields are not set. <a href=":url">Configure now</a>.',
+                [':url' => $settings_url]
+            ),
+            'severity' => $configured ? REQUIREMENT_OK : REQUIREMENT_WARNING,
         ],
     ];
 }
