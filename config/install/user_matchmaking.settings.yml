@@ -10,7 +10,7 @@ mail:
     body: |
       Hi [seeker:display-name],
 
-      Good news! [offerer:display-name] has skills matching your needs in: [matched_terms].
+      Good news! [offerer:display-name] matched with you based on: [matched_terms].
 
       View their profile: [offerer:url]
 
