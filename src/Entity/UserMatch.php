@@ -9,29 +9,7 @@ use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
 
 /**
- * Defines the User Match entity.
- *
- * @ContentEntityType(
- *   id = "user_match",
- *   label = @Translation("User Match"),
- *   handlers = {
- *     "view_builder" = "Drupal\Core\Entity\EntityViewBuilder",
- *     "list_builder" = "Drupal\Core\Entity\EntityListBuilder",
- *     "views_data"   = "Drupal\views\EntityViewsData",
- *     "form" = {
- *       "default" = "Drupal\Core\Entity\ContentEntityForm",
- *       "add"     = "Drupal\Core\Entity\ContentEntityForm",
- *       "edit"    = "Drupal\Core\Entity\ContentEntityForm",
- *       "delete"  = "Drupal\Core\Entity\ContentEntityDeleteForm",
- *     },
- *   },
- *   base_table = "user_match",
- *   entity_keys = {
- *     "id"      = "id",
- *     "uuid"    = "uuid",
- *     "changed" = "changed"
- *   }
- * )
+ * Defines the User Match entity
  */
 class UserMatch extends ContentEntityBase implements EntityChangedInterface
 {
