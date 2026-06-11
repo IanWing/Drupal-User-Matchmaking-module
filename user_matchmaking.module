@@ -1,0 +1,169 @@
+<?php
+
+use Drupal\Core\Entity\EntityInterface;
+
+/**
+ * Implements hook_entity_insert() 
+ */
+function user_matchmaking_entity_insert(EntityInterface $entity)
+{
+    if ($entity->getEntityTypeId() !== 'user' || !empty($entity->_user_matchmaking_skip)) {
+        return;
+    }
+
+    $settings = _user_matchmaking_get_settings();
+    if (empty($settings['field_offers']) || empty($settings['field_needs'])) {
+        return;
+    }
+
+    if ((int) $entity->get('status')->value !== 1) {
+        return;
+    }
+
+    $field_offers = $settings['field_offers'];
+    if (!$entity->hasField($field_offers) || $entity->get($field_offers)->isEmpty()) {
+        return;
+    }
+
+    _user_matchmaking_core($entity, $settings);
+}
+
+/**
+ * Implements hook_entity_update()
+ */
+function user_matchmaking_entity_update(EntityInterface $entity)
+{
+    if ($entity->getEntityTypeId() !== 'user' || !empty($entity->_user_matchmaking_skip) || empty($entity->original)) {
+        return;
+    }
+
+    $settings = _user_matchmaking_get_settings();
+    if (empty($settings['field_offers']) || empty($settings['field_needs'])) {
+        return;
+    }
+
+    $field_offers = $settings['field_offers'];
+    $old_status = (int) $entity->original->get('status')->value;
+    $new_status = (int) $entity->get('status')->value;
+
+    if ($new_status !== 1 || !$entity->hasField($field_offers) || $entity->get($field_offers)->isEmpty()) {
+        return;
+    }
+
+    $offers_changed = ($entity->original->get($field_offers)->getValue() != $entity->get($field_offers)->getValue());
+    $status_activated = ($old_status === 0 && $new_status === 1);
+
+    if ($offers_changed || $status_activated) {
+        _user_matchmaking_core($entity, $settings);
+    }
+}
+
+function _user_matchmaking_core(EntityInterface $offerer, array $settings): void
+{
+    $field_offers = $settings['field_offers'];
+    $field_needs = $settings['field_needs'];
+    $field_notification = $settings['field_notification'];
+
+    $offerer_uid = $offerer->id();
+    $offer_ids = array_column($offerer->get($field_offers)->getValue(), 'target_id');
+
+    // match needs in offers id
+    $seeker_uids = \Drupal::entityQuery('user')
+        ->accessCheck(FALSE)
+        ->condition('status', 1)
+        ->condition($field_needs, $offer_ids, 'IN')
+        ->condition('uid', $offerer_uid, '!=')
+        ->execute();
+
+    if (empty($seeker_uids)) {
+        return;
+    }
+
+    $seekers = \Drupal::entityTypeManager()->getStorage('user')->loadMultiple($seeker_uids);
+    $match_store = \Drupal::entityTypeManager()->getStorage('user_match');
+    $timestamp = time();
+
+    $offered_entities = [];
+    $field_def = \Drupal::service('entity_field.manager')
+        ->getFieldDefinitions('user', 'user')[$field_offers] ?? NULL;
+    if ($field_def && $field_def->getSetting('target_type') === 'taxonomy_term') {
+        $offered_entities = \Drupal::entityTypeManager()
+            ->getStorage('taxonomy_term')
+            ->loadMultiple($offer_ids);
+    }
+
+    $existing_ids = \Drupal::entityQuery('user_match')
+        ->accessCheck(FALSE)
+        ->condition('offerer_uid', [$offerer_uid, ...array_keys($seekers)], 'IN')
+        ->condition('seeker_uid',  [$offerer_uid, ...array_keys($seekers)], 'IN')
+        ->execute();
+
+    $existing = [];
+    foreach ($match_store->loadMultiple($existing_ids) as $match) {
+        $offerer_id = $match->get('offerer_uid')->target_id;
+        $seeker_id = $match->get('seeker_uid')->target_id;
+        $match_key = $offerer_id . ':' . $seeker_id;
+        $existing[$match_key] = $match;
+    }
+    $notified_seekers = [];
+
+    foreach ($seekers as $seeker) {
+        $seeker_uid = $seeker->id();
+        $seeker_ids = array_column($seeker->get($field_needs)->getValue(), 'target_id');
+
+        $matched_ids = array_intersect($offer_ids, $seeker_ids);
+        $matched_entities = array_intersect_key($offered_entities, array_flip($matched_ids));
+
+        _user_matchmaking_save_match($match_store, $existing, "$offerer_uid:$seeker_uid", $offerer_uid, $seeker_uid, $timestamp);
+        _user_matchmaking_save_match($match_store, $existing, "$seeker_uid:$offerer_uid", $seeker_uid, $offerer_uid, $timestamp);
+
+        if (!empty($field_notification) && $seeker->hasField($field_notification)) {
+            // trigger once 
+            $seeker->_user_matchmaking_skip = TRUE;
+            $seeker->set($field_notification, 1)->save();
+        }
+        $notified_seekers[] = $seeker;
+        _user_matchmaking_mail_seeker($seeker, $offerer, $matched_entities);
+    }
+
+
+    if (!empty($notified_seekers)) {
+        if (!empty($field_notification) && $offerer->hasField($field_notification)) {
+            $offerer->_user_matchmaking_skip = TRUE;
+            $offerer->set($field_notification, 1)->save();
+        }
+        _user_matchmaking_mail_offerer($offerer, count($notified_seekers), $notified_seekers);
+    }
+}
+
+// create or update a UserMatch entity
+function _user_matchmaking_save_match($store, array $existing, string $key, $offerer_uid, $seeker_uid, int $timestamp): void
+{
+    if (isset($existing[$key])) {
+        $existing[$key]->save();
+    } else {
+        $store->create([
+            'offerer_uid' => $offerer_uid,
+            'seeker_uid' => $seeker_uid,
+            'created' => $timestamp,
+        ])->save();
+    }
+}
+
+// add theme hook for notification icon
+function user_matchmaking_theme($existing, $type, $theme, $path): array
+{
+    return [
+        'user_matchmaking_notification_bell' => [
+            'variables' => [
+                'active' => FALSE,
+            ],
+            'template' => 'user-matchmaking-notification-bell',
+        ],
+    ];
+}
+
+
+// @todo email logic
+// @todo logs
+// @todo module config status
